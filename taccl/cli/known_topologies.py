@@ -13,6 +13,7 @@ class KnownTopologies:
             'HubAndSpoke': self._topo(topologies.hub_and_spoke),
             'DGX2': self._topo(topologies.dgx2),
             'NDv2': self._topo(topologies.ndv2),
+            'Torus2D': self._topo(topologies.torus2d),
             'custom': self._topo(topologies.custom),
         }
         self.parser.add_argument(f'topology{tag}', type=str, choices=self.constructors.keys(), help=f'topology {tag}')

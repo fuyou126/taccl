@@ -81,6 +81,7 @@ def hub_and_spoke(topo_file):
 
 def dgx2(topo_file):
     print("topo_file:", topo_file)
+    print("------------------------testDGX-2--------------------------------")
     f = open(topo_file, "r")
     topo_json = json.load(f)
     topo_json["nics_per_node"] = 8
@@ -175,3 +176,57 @@ def ndv2(topo_file):
     name = topo_json["name"]
 
     return NodeTopology(f'NDv2-{name}', links, alpha, betas, invbws, nics_per_node, remote_invbw, remote_alpha, remote_beta)
+
+
+def torus2d(topo_file):
+    # 读取 JSON 配置文件
+    with open(topo_file, "r") as f:
+        topo_json = json.load(f)
+
+    print("============================2D Torus 测试===================================")
+    # 设置设备数和拓扑名称
+    gpus_per_node = topo_json["gpus_per_node"]
+    alpha = topo_json["alpha"]
+    node_beta = topo_json["node_betas_list"][0]
+    node_invbw = topo_json["node_invbws_list"][0]
+    nics_per_node = topo_json.get("nics_per_node", -1)
+    remote_invbw = topo_json.get("remote_invbw", -1)
+    remote_alpha = topo_json.get("remote_alpha", -1)
+    remote_beta = topo_json.get("remote_beta", -1)
+    name = topo_json["name"]
+
+    # 假设 gpus_per_node 是平方数，以形成 2D 环形网格
+    grid_size = int(gpus_per_node ** 0.5)
+    assert grid_size * grid_size == gpus_per_node, "gpus_per_node 必须是完全平方数"
+
+    # 构建 2D 环形网格的连接矩阵 links、beta 矩阵和 invbw 矩阵
+    links = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
+    betas = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
+    invbws = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
+
+    for i in range(grid_size):
+        for j in range(grid_size):
+            current = i * grid_size + j
+            neighbors = [
+                ((i - 1) % grid_size) * grid_size + j,  # 上边界连接下侧
+                ((i + 1) % grid_size) * grid_size + j,  # 下边界连接上侧
+                i * grid_size + (j - 1) % grid_size,  # 左边界连接右侧
+                i * grid_size + (j + 1) % grid_size  # 右边界连接左侧
+            ]
+            for neighbor in neighbors:
+                links[current][neighbor] = 1
+                betas[current][neighbor] = node_beta
+                invbws[current][neighbor] = node_invbw
+
+    return NodeTopology(
+        f'Torus-{name}-(n={gpus_per_node})',
+        links,
+        alpha,
+        betas,
+        invbws,
+        nics_per_node,
+        remote_invbw,
+        remote_alpha,
+        remote_beta
+    )
+

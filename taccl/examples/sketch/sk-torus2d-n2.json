@@ -1,0 +1,31 @@
+{
+    "nnodes": 4,
+    "intranode_sketch": {
+        "strategy": "switch",
+        "switches": [
+            [0, 1, 2, 3],
+            [4, 5, 6, 7]
+        ],
+        "switch_hyperedge_strategy": ["uc-min", "uc-min"]
+    },
+    "internode_sketch": {
+        "strategy": "relay",
+        "internode_conn": {
+            "0": [1, 3],
+            "1": [0, 2],
+            "2": [1, 3],
+            "3": [0, 2]
+        },
+        "gpus_to_sender_rev_map": {
+            "0": [0, 4],
+            "1": [1, 5],
+            "2": [2, 6],
+            "3": [3, 7]
+        },
+        "enforce_ordering": true
+    },
+    "symmetry_offsets": [[4, 8], [8, 16]],
+    "hyperparameters": {
+        "input_chunkup": 2
+    }
+}
