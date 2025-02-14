@@ -280,7 +280,7 @@ def parse_and_get_topo(node_topology: NodeTopology, comm_sketch_file, reduce=Fal
     if copies > 1:
         nics_per_node = node_topology.nics_per_node
         assert "internode_sketch" in cs_json
-        assert cs_json["internode_sketch"]["strategy"] == "relay"
+        assert cs_json["internode_sketch"]["strategy"] == "relay" or "ring"
         assert "internode_conn" in cs_json["internode_sketch"]
         internode_conn = cs_json["internode_sketch"]["internode_conn"]
         if not isinstance(internode_conn, dict):
@@ -358,7 +358,9 @@ def parse_and_get_topo(node_topology: NodeTopology, comm_sketch_file, reduce=Fal
         remote_alpha=node_topology.remote_alpha,
         remote_beta=node_topology.remote_beta,
         internode_conn=internode_conn,
-        switches=switches
+        switches=switches,
+        dims=node_topology.dims,
+        wrap=node_topology.wrap
     )
 
     return topology, route_sketch

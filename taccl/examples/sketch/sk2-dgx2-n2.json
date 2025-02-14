@@ -30,5 +30,15 @@
     "symmetry_offsets": [[2, 16], [16, 32]],
     "hyperparameters": {
         "input_chunkup": 1
+    },
+    "parameters": {
+        "routing": {
+            "MIPGaps": 1e-9,
+            "TimeLimit": 1800
+        },
+        "scheduler": {
+            "MIPGaps": 1e-4,
+            "TimeLimit": 1800
+        }
     }
 }

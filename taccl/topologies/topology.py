@@ -4,7 +4,7 @@ from collections import defaultdict
 import math
 
 class NodeTopology(object):
-    def __init__(self, name, links, alpha, betas, invbws, nics_per_node, remote_invbw, remote_alpha, remote_beta):
+    def __init__(self, name, links, alpha, betas, invbws, nics_per_node, remote_invbw, remote_alpha, remote_beta,dims=None, wrap=None):
         self.name = name
         self.links = links
         self.alpha = alpha
@@ -14,6 +14,9 @@ class NodeTopology(object):
         self.remote_invbw = remote_invbw
         self.remote_alpha = remote_alpha
         self.remote_beta = remote_beta
+        # 新增的参数
+        self.dims = dims
+        self.wrap = wrap
 
 def _add_ext_edge(links, ngpus_per_node, ngpus, copies, internode_conn, remote_link, link_split=None, multinode_split=1):
     new_links = [
@@ -36,7 +39,6 @@ def _add_ext_edge(links, ngpus_per_node, ngpus, copies, internode_conn, remote_l
                     if link_split is not None:
                         rlink = remote_link * link_split[s] * multinode_split
                     else:
-
                         rlink = remote_link * multinode_split
                     new_links[dst][src] = rlink
     return new_links
@@ -82,7 +84,9 @@ def _make_switch(switches, node_beta, copies, ngpus_per_node):
 class TACCLTopology(object):
     def __init__(self, name, copies, ngpus_per_node, node_links,
             node_invbws, remote_invbw, remote_alpha, remote_beta,
-            internode_conn, switches=[]):
+            internode_conn, switches=[],dims=None,wrap=None):
+        self.dims = dims
+        self.wrap = wrap
         self.name = name
         self.copies = copies
         self.ngpus_per_node = ngpus_per_node
@@ -268,4 +272,5 @@ class TACCLTopology(object):
             for dst in self.destinations(src):
                 if self.link(src,dst) > L:
                     L = self.link(src,dst)
+                    print("-----------------------------------L=",L)
         self.L = L

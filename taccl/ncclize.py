@@ -788,4 +788,8 @@ def ncclize(algorithm, remap_scratch = None, channel_policy=ChannelPolicy.MatchT
 
     if pretty_print:
         ET.indent(algo_elem, space='  ')
+
+    fh = open("ncclize-test.txt", 'w')
+    fh.write(ET.tostring(algo_elem, encoding='unicode'))
+    fh.close()
     return ET.tostring(algo_elem, encoding='unicode')

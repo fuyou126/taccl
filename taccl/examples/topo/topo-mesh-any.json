@@ -1,0 +1,13 @@
+{
+  "name": "Mesh_any",
+  "gpus_per_node": 27,
+  "nics_per_node": 1,
+  "alpha": 10,
+  "remote_invbw": 35,
+  "remote_alpha": 20,
+  "remote_beta": 15,
+  "betas": [],
+  "invbws": [],
+  "dims": [3,3,3],
+  "wrap": [true,true,true]
+}

@@ -428,6 +428,7 @@ class TACCLScheduler(object):
                                         self.send_first[(o,c,r,l)] = opt.addVar(vtype=GRB.BINARY)
                                         opt.addLConstr(self.send[o,r,dst_o,l] + lat_o <= self.send[c,r,dst,l] + M*(1-self.send_first[(o,c,r,l)]))
                                         opt.addLConstr(self.send[c,r,dst,l] + lat_c <= self.send[o,r,dst_o,l] + M*(self.send_first[(o,c,r,l)]))
+        print("================================schedulered========================")
 
 
     def optimize(self, chunk_order=None, chunk_time=None,
@@ -451,8 +452,11 @@ class TACCLScheduler(object):
             nic_chunk_order_send, nic_chunk_time_send,
             switch_link_mapping_recv, switch_link_mapping_send)
         # opt.write(f'model_{instance_name}.lp')
+        start_solve_time = time()
         opt.optimize()
         end_time = time()
+        print("===========================编码时间:{0}============================".format(start_solve_time - start_time),flush=True)
+        print("===========================求解时间:{0}============================".format(end_time - start_solve_time),flush=True)
         print("strict time (encode+solve)", end_time-start_time, flush=True)
 
         if opt.status == GRB.INFEASIBLE:

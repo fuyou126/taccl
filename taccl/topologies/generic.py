@@ -3,6 +3,8 @@
 
 import json
 from .topology import NodeTopology
+from functools import reduce
+import operator
 
 def validate_and_modify_topo(topo_json, check_links=True):
     assert "name" in topo_json, "Provide a name in the topo file"
@@ -41,15 +43,18 @@ def validate_and_modify_topo(topo_json, check_links=True):
         topo_json["nics_per_node"] = -1
         topo_json["remote_alpha"] = -1
         topo_json["remote_beta"] = -1
-        topo_json["remote_invbws"] = -1
+        topo_json["remote_invbw"] = -1
     return topo_json
 
 def custom(topo_file):
-    topo_json = json.load(topo_file)
+    f = open(topo_file, "r")
+    topo_json = json.load(f)
     topo_json = validate_and_modify_topo(topo_json, check_links=True)
     gpus_per_node = topo_json["gpus_per_node"]
+    alpha = topo_json["alpha"]
     links = topo_json["links"]
     invbws = topo_json["invbws"]
+    betas = topo_json["betas"]
     nics_per_node = topo_json["nics_per_node"]
     remote_invbw = topo_json["remote_invbw"]
     remote_alpha = topo_json["remote_alpha"]
@@ -84,8 +89,8 @@ def dgx2(topo_file):
     print("------------------------testDGX-2--------------------------------")
     f = open(topo_file, "r")
     topo_json = json.load(f)
-    topo_json["nics_per_node"] = 8
-    topo_json["gpus_per_node"] == 16
+    assert topo_json["nics_per_node"] == 8
+    assert topo_json["gpus_per_node"] == 16
     print("Fixing nics_per_node and gpus_per_node. This will overwrite any values provided")
     topo_json = validate_and_modify_topo(topo_json, check_links=False)
     assert len(topo_json["node_invbws_list"]) == 1
@@ -110,8 +115,8 @@ def ndv2(topo_file):
     f = open(topo_file, "r")
     topo_json = json.load(f)
     f.close()
-    topo_json["nics_per_node"] = 1
-    topo_json["gpus_per_node"] == 8
+    assert topo_json["nics_per_node"] == 1
+    assert topo_json["gpus_per_node"] == 8
     print("Fixing nics_per_node and gpus_per_node. This will overwrite any values provided")
     topo_json = validate_and_modify_topo(topo_json, check_links=False)
     assert len(topo_json["node_invbws_list"]) == 2
@@ -178,48 +183,89 @@ def ndv2(topo_file):
     return NodeTopology(f'NDv2-{name}', links, alpha, betas, invbws, nics_per_node, remote_invbw, remote_alpha, remote_beta)
 
 
-def torus2d(topo_file):
-    # 读取 JSON 配置文件
+# have to input dims and wrap instead of links
+# if both of betas and invbws are [], it means all of invbws are same
+def mesh(topo_file):
     with open(topo_file, "r") as f:
         topo_json = json.load(f)
-
-    print("============================2D Torus 测试===================================")
-    # 设置设备数和拓扑名称
+    dims = topo_json["dims"]        # 例如 [nx, ny] 或 [nx, ny, nz]
+    wrap = topo_json["wrap"]        # 每一维是否是环状
+    assert len(dims) == len(wrap), "dims 和 wrap 的长度必须一致"
     gpus_per_node = topo_json["gpus_per_node"]
     alpha = topo_json["alpha"]
-    node_beta = topo_json["node_betas_list"][0]
-    node_invbw = topo_json["node_invbws_list"][0]
-    nics_per_node = topo_json.get("nics_per_node", -1)
-    remote_invbw = topo_json.get("remote_invbw", -1)
-    remote_alpha = topo_json.get("remote_alpha", -1)
-    remote_beta = topo_json.get("remote_beta", -1)
+    # 计算总节点数，并验证与 gpus_per_node 是否一致
+    total_nodes = reduce(operator.mul, dims, 1)
+    assert total_nodes == gpus_per_node, "gpus_per_node 与 dims 的乘积不匹配"
+    # 初始化邻接矩阵：total_nodes x total_nodes 全部置0
+    links = [[0 for _ in range(total_nodes)] for _ in range(total_nodes)]
+    # 辅助函数：将多维坐标转换为一维索引（按照每一维大小计算权重，采用逆序累乘）
+
+    def coord_to_index(coord):
+        idx = 0
+        multiplier = 1
+        # 采用从最后一维到第一维的顺序计算
+        for c, dim in zip(reversed(coord), reversed(dims)):
+            idx += c * multiplier
+            multiplier *= dim
+        return idx
+
+    # 辅助函数：将一维索引转换为多维坐标
+    def index_to_coord(idx):
+        coord = []
+        for dim in reversed(dims):
+            coord.append(idx % dim)
+            idx //= dim
+        return list(reversed(coord))
+
+    # 遍历每个节点，根据每个维度查找相邻节点
+    for idx in range(total_nodes):
+        coord = index_to_coord(idx)
+        # 对于每一维，尝试找前向和后向的邻居
+        for d in range(len(dims)):
+            # 负方向邻居
+            new_coord = coord.copy()
+            new_coord[d] -= 1
+            if new_coord[d] < 0:
+                if wrap[d]:
+                    new_coord[d] = dims[d] - 1  # 环状连接：从另一侧接入
+                else:
+                    new_coord = None  # Mesh边界无连接
+            if new_coord is not None:
+                neighbor_index = coord_to_index(new_coord)
+                links[idx][neighbor_index] = 1
+                links[neighbor_index][idx] = 1  # 保证对称
+
+            # 正方向邻居
+            new_coord = coord.copy()
+            new_coord[d] += 1
+            if new_coord[d] >= dims[d]:
+                if wrap[d]:
+                    new_coord[d] = 0  # 环状连接：回到起始位置
+                else:
+                    new_coord = None
+            if new_coord is not None:
+                neighbor_index = coord_to_index(new_coord)
+                links[idx][neighbor_index] = 1
+                links[neighbor_index][idx] = 1
+
+    # 根据 links 生成 betas 和 invbws（若原始配置中为空）
+    betas = topo_json["betas"]
+    if len(betas) == 0:
+        # 生成与 links 同尺寸的矩阵，每个连接权重乘以 5
+        betas = [[v * 5 for v in row] for row in links]
+    invbws = topo_json["invbws"]
+    if len(invbws) == 0:
+        # 同理，生成每个连接带宽逆值乘以 15
+        invbws = [[v * 15 for v in row] for row in links]
+
+    nics_per_node = topo_json["nics_per_node"]
+    remote_invbw = topo_json["remote_invbw"]
+    remote_alpha = topo_json["remote_alpha"]
+    remote_beta = topo_json["remote_beta"]
     name = topo_json["name"]
 
-    # 假设 gpus_per_node 是平方数，以形成 2D 环形网格
-    grid_size = int(gpus_per_node ** 0.5)
-    assert grid_size * grid_size == gpus_per_node, "gpus_per_node 必须是完全平方数"
-
-    # 构建 2D 环形网格的连接矩阵 links、beta 矩阵和 invbw 矩阵
-    links = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
-    betas = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
-    invbws = [[0 for _ in range(gpus_per_node)] for _ in range(gpus_per_node)]
-
-    for i in range(grid_size):
-        for j in range(grid_size):
-            current = i * grid_size + j
-            neighbors = [
-                ((i - 1) % grid_size) * grid_size + j,  # 上边界连接下侧
-                ((i + 1) % grid_size) * grid_size + j,  # 下边界连接上侧
-                i * grid_size + (j - 1) % grid_size,  # 左边界连接右侧
-                i * grid_size + (j + 1) % grid_size  # 右边界连接左侧
-            ]
-            for neighbor in neighbors:
-                links[current][neighbor] = 1
-                betas[current][neighbor] = node_beta
-                invbws[current][neighbor] = node_invbw
-
     return NodeTopology(
-        f'Torus-{name}-(n={gpus_per_node})',
+        f'Mesh-{name}-(n={gpus_per_node})',
         links,
         alpha,
         betas,
@@ -227,6 +273,7 @@ def torus2d(topo_file):
         nics_per_node,
         remote_invbw,
         remote_alpha,
-        remote_beta
+        remote_beta,
+        dims,
+        wrap
     )
-

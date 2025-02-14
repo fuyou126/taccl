@@ -447,6 +447,8 @@ class TACCLRevScheduler(object):
         else:
             opt.setObjective(self.time, GRB.MINIMIZE)
 
+        print("====================================reduce scheduler===========================")
+
     def optimize_reversed(self, chunk_order=None, time_recv=None,
                 switch_chunk_recv=None, switch_time_recv=None, switch_chunk_send=None, switch_time_send=None,
                 nic_chunk_recv=None, nic_time_recv=None, nic_chunk_send=None, nic_time_send=None,
@@ -472,8 +474,11 @@ class TACCLRevScheduler(object):
             switch_chunk_recv, switch_time_recv, switch_chunk_send, switch_time_send,
             nic_chunk_recv, nic_time_recv, nic_chunk_send, nic_time_send,
             switch_link_mapping_send, switch_link_mapping_recv, endpoints_rc, self.route_sketch.hyperparameters.heuristic, prefer_local_reduce_first)
+        start_solve_time = time()
         opt.optimize()
         end_time = time()
+        print("===========================reduce编码时间:{0}============================".format(start_solve_time - start_time),flush=True)
+        print("===========================reduce求解时间:{0}============================".format(end_time - start_solve_time),flush=True)
         print("strict time (encode+solve)", end_time-start_time, flush=True)
 
         if opt.status == GRB.INFEASIBLE:

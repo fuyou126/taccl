@@ -22,6 +22,6 @@
     },
     "symmetry_offsets": [[2, 16], [16, 32]],
     "hyperparameters": {
-        "input_chunkup": 2
+        "input_chunkup": 1
     }
 }
